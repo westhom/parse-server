@@ -15,6 +15,8 @@ var batch = require('./batch'),
 import { default as GridStoreAdapter } from './GridStoreAdapter';
 import { default as FilesController } from './Controllers/FilesController';
 
+import { ClassesRouter } from './Routers/ClassesRouter';
+
 // Mutate the Parse object to add the Cloud Code handlers
 addParseCloud();
 
@@ -107,21 +109,26 @@ function ParseServer(args) {
   api.use(middlewares.allowMethodOverride);
   api.use(middlewares.handleParseHeaders);
 
-  var router = new PromiseRouter();
+  var appRouter = new PromiseRouter();
 
-  router.merge(require('./classes'));
-  router.merge(require('./users'));
-  router.merge(require('./sessions'));
-  router.merge(require('./roles'));
-  router.merge(require('./analytics'));
-  router.merge(require('./push').router);
-  router.merge(require('./installations'));
-  router.merge(require('./functions'));
-  router.merge(require('./schemas'));
+  let routers = [
+    new ClassesRouter().getExpressRouter(),
+    require('./users'),
+    require('./sessions'),
+    require('./roles'),
+    require('./analytics'),
+    require('./push').router,
+    require('./installations'),
+    require('./functions'),
+    require('./schemas')
+  ];
+  routers.forEach((router) => {
+    appRouter.merge(router);
+  });
 
-  batch.mountOnto(router);
+  batch.mountOnto(appRouter);
 
-  router.mountOnto(api);
+  appRouter.mountOnto(api);
 
   api.use(middlewares.handleParseErrors);
 
