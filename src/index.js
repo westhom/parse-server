@@ -5,7 +5,6 @@ var batch = require('./batch'),
     cache = require('./cache'),
     DatabaseAdapter = require('./DatabaseAdapter'),
     express = require('express'),
-    PushAdapter = require('./Adapters/Push/PushAdapter'),
     middlewares = require('./middlewares'),
     multer = require('multer'),
     Parse = require('parse/node').Parse,
@@ -14,8 +13,11 @@ var batch = require('./batch'),
 
 import { GridStoreAdapter } from './Adapters/Files/GridStoreAdapter';
 import { S3Adapter } from './Adapters/Files/S3Adapter';
-
 import { FilesController } from './Controllers/FilesController';
+
+import ParsePushAdapter from './Adapters/Push/ParsePushAdapter';
+import { PushController } from './Controllers/PushController';
+
 
 // Mutate the Parse object to add the Cloud Code handlers
 addParseCloud();
@@ -51,7 +53,17 @@ function ParseServer(args) {
     DatabaseAdapter.setAdapter(args.databaseAdapter);
   }
 
+  // Make files adapter
   let filesAdapter = args.filesAdapter || new GridStoreAdapter();
+
+  // Make push adapter
+  let pushConfig = args.push;
+  let pushAdapter;
+  if (pushConfig && pushConfig.adapter) {
+    pushAdapter = pushConfig.adapter;
+  } else if (pushConfig) {
+    pushAdapter = new ParsePushAdapter(pushConfig)
+  }
 
   if (args.databaseURI) {
     DatabaseAdapter.setAppDatabaseURI(args.appId, args.databaseURI);
@@ -87,10 +99,6 @@ function ParseServer(args) {
     cache.apps[args.appId]['facebookAppIds'].push(process.env.FACEBOOK_APP_ID);
   }
 
-  // Register push senders
-  var pushConfig = args.push;
-  PushAdapter.getAdapter().initialize(pushConfig);
-
   // Initialize the node client SDK automatically
   Parse.initialize(args.appId, args.javascriptKey || '', args.masterKey);
   if(args.serverURL) {
@@ -122,10 +130,11 @@ function ParseServer(args) {
   router.merge(require('./sessions'));
   router.merge(require('./roles'));
   router.merge(require('./analytics'));
-  router.merge(require('./push').router);
   router.merge(require('./installations'));
   router.merge(require('./functions'));
   router.merge(require('./schemas'));
+  let pushController = new PushController(pushAdapter);
+  router.merge(pushController.getExpressRouter());
 
   batch.mountOnto(router);
 
