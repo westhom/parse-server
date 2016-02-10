@@ -20,6 +20,17 @@ export class GridStoreAdapter extends FilesAdapter {
     });
   }
 
+  deleteFile(config, filename) {
+    return config.database.connect().then(() => {
+      let gridStore = new GridStore(config.database.db, filename, 'r');
+      return gridStore.open();
+    }).then((gridStore) => {
+      return gridStore.unlink();
+    }).then((gridStore) => {
+      return gridStore.close();
+    });
+  }
+
   getFileData(config, filename) {
     return config.database.connect().then(() => {
       return GridStore.exist(config.database.db, filename);
